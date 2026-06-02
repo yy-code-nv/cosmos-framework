@@ -14,7 +14,9 @@ import torch.nn.functional as F
 from cosmos_framework.utils.easy_io import easy_io
 from cosmos_framework.utils.helper_test import RunIf
 from cosmos_framework.configs.base.defaults.cluster import DefaultClusterConfig as CLUSTER_CONFIG
-from cosmos_framework.configs.base.defaults.tokenizer import PRETRAINED_TOKENIZER_DCAE_PTH
+from cosmos_framework.configs.base.defaults.tokenizer import (
+    PRETRAINED_TOKENIZER_DCAE_4X32X32_C64_T120_256P_FPS_ALL_ENCODER_CAUSAL_DECODER_CHUNKCAUSAL4_NOGAN_COSMOS_PAD_7_V0PT2_PTH,
+)
 from cosmos_framework.model.vfm.tokenizers.dc_ae.dc_ae_4x32x32 import DCAE4x32x32Interface
 from cosmos_framework.model.vfm.tokenizers.unittest_utils import (
     numpy2tensor,
@@ -29,7 +31,7 @@ Usage:
 
 """
 
-VAE_PATH = PRETRAINED_TOKENIZER_DCAE_PTH
+VAE_PATH = PRETRAINED_TOKENIZER_DCAE_4X32X32_C64_T120_256P_FPS_ALL_ENCODER_CAUSAL_DECODER_CHUNKCAUSAL4_NOGAN_COSMOS_PAD_7_V0PT2_PTH
 
 
 def _make_cosmos_ae_from_s3(encoder_width_list):

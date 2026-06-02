@@ -392,17 +392,15 @@ def augment_user_prompt(
     elif output_format == "temporal_caption":
         event = assistant_message[0]
         if random.random() < 0.333333:
-
             start = round(event["start"])
             end = round(event["end"])
         elif random.random() < 0.666666:
-
             start = round(event["start"] * 2) / 2
             end = round(event["end"] * 2) / 2
         else:
             start = event["start"]
             end = event["end"]
-        if start == end:  # HACK: remove events with start == end
+        if start == end:
             raise ValueError("Start and end time are the same for data.")
         if timestamp_format == "seconds":
             if random.random() < 0.5:

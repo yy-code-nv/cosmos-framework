@@ -4,10 +4,15 @@
 from cosmos_framework.trainer import ImaginaireTrainer
 from cosmos_framework.utils import log
 from cosmos_framework.utils.config_helper import import_all_modules_from_package
+from cosmos_framework.configs.base.defaults.checkpointer import register_checkpoint, register_ckpt_type
 from cosmos_framework.configs.base.vlm.defaults.callbacks import register_callbacks
-from cosmos_framework.configs.base.vlm.defaults.checkpointer import register_checkpoint, register_ckpt_type
 from cosmos_framework.configs.base.vlm.defaults.config import Config
-
+from cosmos_framework.configs.base.vlm.defaults.dataloader import register_data_debug
+from cosmos_framework.configs.base.vlm.defaults.dataloader_weighted_url import (
+    register_data_recipe,
+    register_data_weighted_url,
+    register_data_weighted_url_with_text,
+)
 from cosmos_framework.configs.base.vlm.defaults.model import register_model
 from cosmos_framework.configs.base.vlm.defaults.optimizer import register_optimizer, register_scheduler
 from cosmos_framework.configs.base.vlm.defaults.vlm_policy import register_vlm_policy
@@ -42,6 +47,10 @@ def make_config() -> Config:
     register_model()
     register_vlm_policy()
     # Register dataloader configs
+    register_data_weighted_url()
+    register_data_recipe()
+    register_data_weighted_url_with_text()
+    register_data_debug()
     log.info("Registering optimizer, scheduler, checkpoint, ckpt type, and callbacks")
     register_optimizer()
     register_scheduler()

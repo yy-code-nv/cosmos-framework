@@ -19,7 +19,6 @@ from cosmos_framework.model.attention.utils import get_arch_tag
 from cosmos_framework.model.attention.utils.safe_ops import log
 from cosmos_framework.model.attention.utils.safe_ops.functools import lru_cache
 
-
 # Force using padded mask as a potential workaround for failing use cases
 FORCE_PADDED_MASK = False
 
@@ -46,6 +45,17 @@ def get_dtype_choices(arch_tag: int) -> dict:
         log.debug("cuDNN Attention is not supported because compute capability is below the minimum (8.0).")
         return {}
 
+    # COSMOS-RELEASE-BEGIN-IGNORE
+    ## not seem to work.
+    # if arch_tag in [90, 100]:
+    #     log.debug(f"cuDNN Attention supports FP8 for {arch_tag=}.")
+    #     return {
+    #         torch.float16: cudnn.data_type.HALF,
+    #         torch.bfloat16: cudnn.data_type.BFLOAT16,
+    #         torch.float8_e4m3fn: cudnn.data_type.FP8_E4M3,
+    #         torch.float8_e5m2: cudnn.data_type.FP8_E5M2,
+    #     }
+    # COSMOS-RELEASE-END-IGNORE
 
     log.debug(f"cuDNN Attention only supports FP16 and BF16 for {arch_tag=}.")
     return {
@@ -316,11 +326,15 @@ def cudnn_sdpa_fwd_generate_op(
     handle = cudnn.create_handle()
 
     def cudnn_operation(q: Tensor, k: Tensor, v: Tensor, output: Tensor, lse: Tensor | None = None):
-
+        # NOTE: This is INCREDIBLY important to do -- this is what wasted days of my time
         # with random NaNs and illegal memory accesses and things of that nature.
         stream = torch.cuda.current_stream(q.device)
         cudnn.set_stream(handle=handle, stream=stream.cuda_stream)
 
+        # COSMOS-RELEASE-BEGIN-IGNORE
+        # caching allocator plays nicely with the LRU cache over this, but for now let's avoid
+        # premature optimization.
+        # COSMOS-RELEASE-END-IGNORE
         workspace = torch.zeros(workspace_size_bytes, device=device, dtype=torch.uint8)  # [workspace_size_bytes]
 
         variant_pack = {

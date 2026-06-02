@@ -10,7 +10,9 @@ import torch
 from cosmos_framework.utils.easy_io import easy_io
 from cosmos_framework.utils.helper_test import RunIf
 from cosmos_framework.configs.base.defaults.cluster import DefaultClusterConfig as CLUSTER_CONFIG
-from cosmos_framework.configs.base.defaults.tokenizer import PRETRAINED_TOKENIZER_DCAE_PTH
+from cosmos_framework.configs.base.defaults.tokenizer import (
+    PRETRAINED_TOKENIZER_DCAE_4X32X32_C64_T120_256P_FPS_ALL_ENCODER_CAUSAL_DECODER_CHUNKCAUSAL4_NOGAN_COSMOS_PAD_7_V0PT2_PTH,
+)
 from cosmos_framework.configs.base.defaults.unittest import TOKENIZER_RECONSTRUCTION_VIDEO_PATH, UNITTEST_CONFIG
 from cosmos_framework.model.vfm.tokenizers.dc_ae.dc_ae_4x32x32 import DEFAULT_MODEL_NAME, DCAE4x32x32Interface
 from cosmos_framework.model.vfm.tokenizers.dc_ae.dc_ae_v import DCAEV, dc_ae_v_f32t4_encoder_causal_decoder_chunk_causal_4
@@ -27,7 +29,7 @@ Usage:
     RUN_SKIPPED_TEST_LOCALLY=1 pytest -s cosmos_framework/model/vfm/tokenizers/dc_ae/dc_ae_4x32x32_test.py -k test_dc_ae_local_checkpoint
 """
 
-VAE_PATH = PRETRAINED_TOKENIZER_DCAE_PTH
+VAE_PATH = PRETRAINED_TOKENIZER_DCAE_4X32X32_C64_T120_256P_FPS_ALL_ENCODER_CAUSAL_DECODER_CHUNKCAUSAL4_NOGAN_COSMOS_PAD_7_V0PT2_PTH
 LOCAL_CHECKPOINT = os.path.expanduser(
     "~/work/imaginaire4/logs/cosmos_4x32x32_0211/checkpoints/"
     "dcae4x32x32_c64_t120_256p_fps_all_encoder_causal_decoder_chunk_causal_4_nogan_cosmos_pad_7_v0.1.pt"

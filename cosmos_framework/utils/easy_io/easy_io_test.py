@@ -22,12 +22,12 @@ def setup_s3():
 @RunIf(requires_file="credentials/pbss_getty.secret")
 def test_s3_backend():
     setup_s3()
-    for ith, _ in enumerate(easy_io.list_dir_or_file("s3://bucket6/")):
+    for ith, _ in enumerate(easy_io.list_dir_or_file("s3://checkpoints/")):
         if ith > 5:
             break
 
-    easy_io.copyfile_from_local("pyproject.toml", "s3://bucket6/pyproject.toml")
-    easy_io.remove("s3://bucket6/pyproject.toml")
+    easy_io.copyfile_from_local("pyproject.toml", "s3://checkpoints/pyproject.toml")
+    easy_io.remove("s3://checkpoints/pyproject.toml")
 
 
 @pytest.mark.L1("Requires data uploading to S3.")

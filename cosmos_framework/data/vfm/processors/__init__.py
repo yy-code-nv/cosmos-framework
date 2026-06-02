@@ -104,13 +104,6 @@ def build_processor(
     bucket: Optional[str] = None,
     cache_dir: Optional[str] = None,
 ):
-    # Local artifact path: source the processor from a bundled directory
-    # (e.g. the top level of nvidia/Cosmos3-Nano, which ships its own
-    # preprocessor_config.json, tokenizer.json, etc). Avoids the redundant
-    # upstream Qwen/Qwen3-VL-*-Instruct fetch. Cosmos3-Nano/Super both ship
-    # a Qwen3VL-compatible processor, so dispatch to Qwen3VLProcessor.
-    if os.path.isdir(tokenizer_type):
-        return Qwen3VLProcessor(tokenizer_type, cache_dir=cache_dir)
     if credentials is None or bucket is None:
         if config_variant is None:
             config_variant = "s3"
@@ -125,7 +118,12 @@ def build_processor(
         return Qwen3VLProcessor(tokenizer_type, credentials=credentials, bucket=bucket, cache_dir=cache_dir)
     elif "nvidia/NVIDIA-Nemotron-Nano-12B-v2-VL-BF16" in tokenizer_type:
         return NemotronVLProcessor(tokenizer_type, credentials=credentials, bucket=bucket, cache_dir=cache_dir)
-    elif "NVIDIA-Nemotron-3-Dense-VL" in tokenizer_type or "Qwen3-2B-ViT" in tokenizer_type:
+    elif (
+        "NVIDIA-Nemotron-3-Dense-VL" in tokenizer_type
+        or "Qwen3-2B-ViT" in tokenizer_type
+        or "nvidia/Cosmos3-Reasoner-2B-Private" in tokenizer_type
+        or "nvidia/Cosmos3-Edge-Reasoner" in tokenizer_type
+    ):
         return Nemotron3DenseVLProcessor(tokenizer_type, credentials=credentials, bucket=bucket, cache_dir=cache_dir)
     elif "Qwen/Qwen3-0.6B" in tokenizer_type:
         local_path = _download_llm_tokenizer(tokenizer_type, credentials, bucket, cache_dir)
@@ -138,25 +136,8 @@ def build_processor(
         raise ValueError(f"Tokenizer type {tokenizer_type} not supported")
 
 
-def build_processor_lazy(
-    *args,
-    repository: Optional[str] = None,
-    revision: Optional[str] = None,
-    subdir: str = "",
-    **kwargs,
-):
+def build_processor_lazy(*args, **kwargs):
     """LazyCall wrapper that resolves ``build_processor`` on this module at call time.
-
-    Two modes:
-      1. Upstream tokenizer (legacy): pass ``tokenizer_type="<HF repo>"``
-         (and optional ``config_variant`` / ``credentials`` / ``bucket``).
-         The processor is sourced from the upstream HF repo (e.g.
-         ``Qwen/Qwen3-VL-8B-Instruct``).
-      2. Local artifact: pass ``repository`` + ``revision`` (and optional
-         ``subdir``). The processor is sourced from the HF cache of the
-         named artifact (e.g. ``nvidia/Cosmos3-Nano``), reusing the same
-         revision the OmniModel checkpoint download uses. Avoids a
-         redundant upstream Qwen3-VL-*-Instruct fetch.
 
     LazyCall captures its target at config-construction time, so a direct
     ``L(build_processor)`` would freeze the original function reference and
@@ -165,13 +146,4 @@ def build_processor_lazy(
     lookup on every call, so test fixtures patching ``build_processor`` are
     honored when the config is instantiated.
     """
-    if repository is not None:
-        from cosmos_framework.utils.checkpoint_db import CheckpointDirHf
-
-        if revision is None:
-            raise ValueError("'revision' is required when 'repository' is set")
-        local_path = CheckpointDirHf(repository=repository, revision=revision).download()
-        if subdir:
-            local_path = os.path.join(local_path, subdir)
-        return sys.modules[__name__].build_processor(local_path, **kwargs)
     return sys.modules[__name__].build_processor(*args, **kwargs)

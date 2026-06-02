@@ -22,8 +22,14 @@ from cosmos_framework.model.attention.utils.environment import (
 from cosmos_framework.model.attention.utils.safe_ops import log
 from cosmos_framework.model.attention.utils.safe_ops.functools import lru_cache
 
+# COSMOS-RELEASE-BEGIN-IGNORE
+# isort: split
+from cosmos_framework.model.attention.cudnn.checks import cudnn_attention_check
+
+# COSMOS-RELEASE-END-IGNORE
 
 BACKEND_CHECK_MAP = {
+    "cudnn": cudnn_attention_check,  # COSMOS-RELEASE-IGNORELINE
     "natten": natten_attention_check,
     "flash2": flash2_attention_check,
     "flash3": flash3_attention_check,
@@ -131,17 +137,22 @@ def get_backend_list(arch_tag: int) -> list[str]:
     if arch_tag == 90:
         default_backends = [
             "flash3",
+            "cudnn",  # COSMOS-RELEASE-IGNORELINE
             "natten",
             "flash2",
         ]
     elif arch_tag in [100, 103]:
         default_backends = [
+            # COSMOS-RELEASE-BEGIN-IGNORE
+            "cudnn",
+            # COSMOS-RELEASE-END-IGNORE
             "natten",
             "flash2",
         ]
     elif arch_tag >= 80:
         default_backends = [
             "flash2",
+            "cudnn",  # COSMOS-RELEASE-IGNORELINE
             "natten",
         ]
     else:

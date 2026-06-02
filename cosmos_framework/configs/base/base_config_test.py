@@ -29,7 +29,7 @@ def test_config_init_experiment_mot(experiment_name):
     Parameterized test to verify config initialization for multiple experiments.
     PYTHONPATH=. torchrun --nproc_per_node=8 -m pytest -s cosmos_framework/configs/base/config_test_mot.py --L1
     """
-    config_file = "configs/base/config.py"
+    config_file = "cosmos_framework/configs/base/config.py"
     config_module = get_config_module(config_file)
     config = importlib.import_module(config_module).make_config()
     config = override(

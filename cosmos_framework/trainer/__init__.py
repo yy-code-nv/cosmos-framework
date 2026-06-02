@@ -28,6 +28,10 @@ from cosmos_framework.utils import callback, distributed, ema, log, misc
 from cosmos_framework.utils.checkpointer import Checkpointer
 from cosmos_framework.utils.misc import StragglerDetectorV2
 
+# COSMOS-RELEASE-BEGIN-IGNORE: remove one_logger
+from cosmos_framework.utils.one_logger.one_logger_utils import initialize_one_logger_from_imaginaire_config
+
+# COSMOS-RELEASE-END-IGNORE
 
 
 class ImaginaireTrainer:
@@ -109,6 +113,12 @@ class ImaginaireTrainer:
         # Initialize cuDNN.
         torch.backends.cudnn.deterministic = config.trainer.cudnn.deterministic
         torch.backends.cudnn.benchmark = config.trainer.cudnn.benchmark
+        # COSMOS-RELEASE-BEGIN-IGNORE: remove one_logger
+        # OneLogger - initialize one_logger before instantiating CallBackGroup
+        enable_one_logger = os.environ.get("ENABLE_ONELOGGER", "FALSE").lower() == "true"
+        if enable_one_logger:
+            initialize_one_logger_from_imaginaire_config(config)
+        # COSMOS-RELEASE-END-IGNORE
         # Initialize the callback functions.
         self.callbacks = callback.CallBackGroup(config=config, trainer=self)
         # Initialize the model checkpointer.
@@ -224,7 +234,6 @@ class ImaginaireTrainer:
             model_ddp = model
         else:
             raise ValueError(f"Unknown distributed parallelism mode: {self.config.trainer.distributed_parallelism}")
-
         log.info("Starting training...")
         sm_carveout = int(os.environ.get("GROUPED_MM_SM_CARVEOUT", "0"))
         if sm_carveout:

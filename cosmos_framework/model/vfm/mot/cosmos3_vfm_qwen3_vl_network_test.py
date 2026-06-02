@@ -2,6 +2,7 @@
 # SPDX-License-Identifier: OpenMDW-1.1
 
 import gc
+import getpass
 import math
 import os
 from typing import Any
@@ -736,11 +737,15 @@ def test_unified_llm_outputs_with_hf(config_name: str):
         from transformers import Qwen3VLForConditionalGeneration as HFModelClass
 
     # Create the HF model
-    tokenizer_hf = AutoTokenizer.from_pretrained(config["model_name"])
+    tokenizer_hf = AutoTokenizer.from_pretrained(
+        config["model_name"],
+        cache_dir=f"/nfs/dir/dir_cosmos_base/users/{getpass.getuser()}/hf_cache/",
+    )
     hf_vlm_model = HFModelClass.from_pretrained(
         config["model_name"],
         dtype=torch.bfloat16,
         device_map="auto",
+        cache_dir=f"/nfs/dir/dir_cosmos_base/users/{getpass.getuser()}/hf_cache/",
     )
     if config["model_type"] == "dense_llm":
         hf_model = hf_vlm_model

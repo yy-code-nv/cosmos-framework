@@ -850,7 +850,6 @@ def _pack_action_tokens(
     packed_seq.action.token_shapes.append((action_split_len,))
     packed_seq.action.tokens.append(input_action_tokens)
 
-
     condition_set = {idx for idx in condition_frame_indexes_action if 0 <= idx < action_split_len}
     assert isinstance(packed_seq.action.condition_mask, list)
 
@@ -2095,7 +2094,7 @@ def verify_natten_parameter_list(
             {'window_size_float': (0.5, 0.5), 'dilation_float': (1.0, 0.0)}  # valid
 
             # Fixed window size of 8x8, dilation of 2x1.
-
+            # NOTE: requires ALL inputs to be at least 16x8
             {'window_size': (8, 8), 'dilation': (2, 1)}  # valid
 
             # Multi-profile: different parameters for 2D (images) and 3D (videos)
@@ -2231,7 +2230,7 @@ def generate_natten_metadata(
             {'window_size_float': (0.5, 0.5), 'dilation_float': (1.0, 0.0)}  # valid
 
             # Fixed window size of 8x8, dilation of 2x1.
-
+            # NOTE: requires ALL inputs to be at least 16x8
             {'window_size': (8, 8), 'dilation': (2, 1)}  # valid
 
             # Invalid:
@@ -2247,6 +2246,11 @@ def generate_natten_metadata(
             over layers (nn.ModuleList).
     """
 
+    # COSMOS-RELEASE-BEGIN-IGNORE
+    # sequence-packed tensors containing only and exactly subsequences with sizes from
+    # token_shapes, in the same order, and with no padding in between.
+    # We should either make sure this never happens, or have static checks in place.
+    # COSMOS-RELEASE-END-IGNORE
 
     if token_shapes is None or len(token_shapes) < 1:
         raise ValueError("'token_shapes' is required for 'three_way' attention.")
@@ -2269,6 +2273,11 @@ def generate_natten_metadata(
             return tuple(x for x in shape if x > 1)
 
         # Infer token layout rank (dimensionality)
+        # COSMOS-RELEASE-BEGIN-IGNORE
+        # compresses that dimension into size 1, which gets filtered out. To avoid failing checks
+        # we need to take the maximum dimensionality over the entire batch. We'll assert each token
+        # shape matches that dimensionality later, if NATTEN is required for this batch.
+        # COSMOS-RELEASE-END-IGNORE
         num_dims = max([len(filter_shape(token_shape)) for token_shape in token_shapes])
 
         # Single pass: check if all layers support this dimensionality and if any need processing
@@ -2363,9 +2372,9 @@ def generate_natten_metadata(
             is_causal = dim_params["is_causal"]
 
             # Create varlen metadata for natten varlen/varsized ops
-
+            # NOTE: generate_multi_dim_varlen_parameters will automatically map window size -1 to
             # full size, that's why constant window sizes aren't allowed.
-
+            # NOTE: if any of the parameters are constant, natten will simplify them
             natten_metadata.append(
                 generate_multi_dim_varlen_parameters(
                     token_layout_list=token_layout_list,
@@ -2780,7 +2789,6 @@ def build_sequence_plans_from_data_batch(
     Returns:
         List of SequencePlan objects, one per sample in the batch.
     """
-
     # For new modalities, please generate the sequence_plan in the dataset class!!!!
 
     # If sequence_plan already exists in data_batch, return it
@@ -2789,7 +2797,6 @@ def build_sequence_plans_from_data_batch(
 
     assert "action" not in data_batch or data_batch["action"] is None, "Action data SHOULD have sequence_plans!"
     assert "sound" not in data_batch or data_batch["sound"] is None, "Sound data SHOULD have sequence_plans!"
-
 
     # Determine batch size from available tensors
     batch_size = 0

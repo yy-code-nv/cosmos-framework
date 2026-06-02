@@ -1323,6 +1323,7 @@ class Wan2pt2VAEInterface(VideoTokenizerInterface):
         # with older configurations.
         temporal_window: int | None = None,
         encode_bucket_multiple: int | None = None,
+        causal: bool = True,
     ):
         # Remove temporal_window and encode_bucket_multiple once they have been
         # removed from the uploaded HuggingFace checkpoint.
@@ -1345,9 +1346,7 @@ class Wan2pt2VAEInterface(VideoTokenizerInterface):
 
         self.chunk_duration = chunk_duration
 
-        # Local-path support: skip the s3:// prefix when bucket_name is empty
-        # so OSS users can point vae_path at an absolute local file.
-        vae_path_full = f"s3://{bucket_name}/{vae_path}" if bucket_name else vae_path
+        vae_path_full = f"s3://{bucket_name}/{vae_path}"
         self.model = WanVAE(
             dtype=torch.bfloat16,
             is_amp=False,
@@ -1367,6 +1366,8 @@ class Wan2pt2VAEInterface(VideoTokenizerInterface):
 
         self._spatial_compression_factor = spatial_compression_factor
         self._temporal_compression_factor = temporal_compression_factor
+        self._causal = causal
+        assert self._causal, "Wan2pt2VAEInterface is a causal tokenizer; causal must be True."
 
     @property
     def dtype(self) -> torch.dtype:
@@ -1417,6 +1418,8 @@ class Wan2pt2VAEInterface(VideoTokenizerInterface):
         warmup_resolutions: Sequence[str],
         output_dir: str,
         aspect_ratio: str | None = None,
+        # ignores torch compile args
+        **kwargs,
     ) -> None:
         """AOT-compile the tokenizer's chunk-level encode for every resolution.
 

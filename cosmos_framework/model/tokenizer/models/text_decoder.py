@@ -1257,8 +1257,8 @@ class TextDecoderWrapper(nn.Module):
         """Generate an answer to a question about an image.
 
         Qwen3 uses its native chat template. Nemotron uses its own native
-        chat template with ``<|im_start|>``, ``<|im_end|>``, and
-        ``</think>`` in no-thinking mode.
+        chat template with ``<|im_start|>``, ``<|im_end|>``, and the
+        ``</think>\n`` no-thinking prefix.
 
         Args:
             image_feats_tensor: [N, encoder_dim] features for ONE image.

@@ -39,7 +39,8 @@ TRAINING: Final[bool] = _get_bool("COSMOS_TRAINING", True)
 This is used to make training dependencies optional.
 """
 
-INTERNAL: Final[bool] = _get_bool("COSMOS_INTERNAL", False)
+# COSMOS-RELEASE-REPLACE-NEXT: TRAINING False
+INTERNAL: Final[bool] = _get_bool("COSMOS_INTERNAL", TRAINING)
 """Whether to use internal (nvidia-only) resources (e.g. S3)."""
 
 SMOKE: Final[bool] = _get_bool("COSMOS_SMOKE", False)
@@ -67,6 +68,10 @@ VERBOSE: Final[bool] = _get_bool("COSMOS_VERBOSE", INTERNAL)
 EXPERIMENTAL_CHECKPOINTS: Final[bool] = _get_bool("COSMOS_EXPERIMENTAL_CHECKPOINTS", INTERNAL)
 """Whether to enable experimental checkpoints."""
 
+# COSMOS-RELEASE-BEGIN-IGNORE
+ENABLE_PI_CHECKPOINTS: Final[bool] = _get_bool("COSMOS_ENABLE_PI_CHECKPOINTS", False)
+"""Whether to enable checkpoints from NVIDIA-DIR/Cosmos-Predict2.5-2B-PI-Private."""
+# COSMOS-RELEASE-END-IGNORE
 
 if INTERNAL:
     TRAINING = True

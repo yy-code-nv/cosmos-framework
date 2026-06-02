@@ -4,19 +4,20 @@
 # -----------------------------------------------------------------------------
 
 """
-Tests for UniAE S1 tokenizer (4x16x16).
+Tests for UniAE S3 tokenizer (4x16x16).
 
 Usage:
     # Basic encode/decode test with random data
-    CUDA_VISIBLE_DEVICES=0 RUN_SKIPPED_TEST_LOCALLY=1 pytest -s cosmos_framework/model/vfm/tokenizers/uniae/noncausal_4x16x16_test.py -k test_uniae_s1
+    CUDA_VISIBLE_DEVICES=0 RUN_SKIPPED_TEST_LOCALLY=1 pytest -s cosmos_framework/model/vfm/tokenizers/uniae/noncausal_4x16x16_test.py -k test_uniae_s3
 
-    # Full reconstruction test with real video (saves uniae_recon.mp4)
+    # Full reconstruction test with real video (saves uniae_s3_recon.mp4)
     CUDA_VISIBLE_DEVICES=0 RUN_SKIPPED_TEST_LOCALLY=1 pytest -s cosmos_framework/model/vfm/tokenizers/uniae/noncausal_4x16x16_test.py -k test_local_video
 
 Note: On this machine, CUDA device 0 = RTX 6000 Ada (48GB), device 1 = T400 (2GB).
       Always use CUDA_VISIBLE_DEVICES=0 for the RTX 6000.
 """
 
+import inspect
 import os
 
 import numpy as np
@@ -25,9 +26,10 @@ import torch
 
 from cosmos_framework.utils.easy_io import easy_io
 from cosmos_framework.utils.helper_test import RunIf
+from cosmos_framework.model.tokenizer.models.sparse_autoencoder import AutoencoderKL
 from cosmos_framework.configs.base.defaults.cluster import DefaultClusterConfig as CLUSTER_CONFIG
 from cosmos_framework.configs.base.defaults.unittest import TOKENIZER_RECONSTRUCTION_VIDEO_PATH, UNITTEST_CONFIG
-from cosmos_framework.model.vfm.tokenizers.uniae.noncausal_4x16x16 import UniAEVAE
+from cosmos_framework.model.vfm.tokenizers.uniae.noncausal_4x16x16 import _S1_ARCH, UniAEVAE
 from cosmos_framework.model.vfm.tokenizers.unittest_utils import (
     numpy2tensor,
     pad_video_batch,
@@ -35,41 +37,78 @@ from cosmos_framework.model.vfm.tokenizers.unittest_utils import (
     unpad_video_batch,
 )
 
-UNIAE_S1_PATH = (
-    "s3://bucket0/pretrained/tokenizers/video/cosmos/"
-    "uniae4x16x16_c48_t8to24_64to512p_fps_all_encoder_noncausal_decoder_noncausal_nogan_best_s1.pt"
+UNIAE_S3_PATH = (
+    "s3://bucket1/uniae/tok_experiments/"
+    "uniae_s3_prod32_ditval_video_b1_50k_r1/checkpoints/iter_000050000.pt"
 )
 
 
 @pytest.mark.L0
+def test_uniae_s1_arch_matches_autoencoder_signature() -> None:
+    """The VFM wrapper should not pass stale tokenizer-training kwargs."""
+    legacy_attention_keys = {
+        "encoder_attn_mode",
+        "encoder_window_size",
+        "decoder_attn_mode",
+        "decoder_window_size",
+    }
+    signature_keys = set(inspect.signature(AutoencoderKL.__init__).parameters)
+
+    assert legacy_attention_keys.isdisjoint(_S1_ARCH)
+    assert set(_S1_ARCH).issubset(signature_keys)
+    assert _S1_ARCH["use_text_alignment"] is False
+    assert _S1_ARCH["use_post_text_alignment"] is False
+
+
+@pytest.mark.L0
+@pytest.mark.parametrize(
+    ("num_pixel_frames", "expected_latent_frames"),
+    [
+        (1, 1),
+        (2, 1),
+        (4, 1),
+        (5, 2),
+        (7, 2),
+        (8, 2),
+        (13, 4),
+        (16, 4),
+    ],
+)
+def test_uniae_latent_num_frames_matches_noncausal_padding(
+    num_pixel_frames: int,
+    expected_latent_frames: int,
+) -> None:
+    """Frame-count helper should match encode's pad-to-multiple behavior."""
+    vae = UniAEVAE.__new__(UniAEVAE)
+    vae._temporal_compression_factor = 4
+
+    assert vae.get_latent_num_frames(num_pixel_frames) == expected_latent_frames
+
+
+@pytest.mark.L0
 @pytest.mark.skipif(os.getenv("RUN_SKIPPED_TEST_LOCALLY") != "1", reason="local_test_only")
-def test_uniae_s1():
-    """Basic encode/decode test with random data."""
+def test_uniae_s3():
+    """Basic shape check: encode/decode with random data for a few T values."""
     vae = UniAEVAE(
-        vae_pth=UNIAE_S1_PATH,
+        vae_pth=UNIAE_S3_PATH,
         object_store_credential_path_pretrained=CLUSTER_CONFIG.object_store_credential_pretrained,
         device="cuda",
+        dtype=torch.bfloat16,
     )
-    print(f"\n[UniAE S1] Model parameters: {vae.count_param() / 1e6:.2f}M")
+    print(f"\n[UniAE S3] Model parameters: {vae.count_param() / 1e6:.2f}M")
 
     H, W = 256, 256
-    for T in [4, 16, 32]:
-        print(f"\n[UniAE S1] Testing with T={T} frames, H={H}, W={W}")
-        video = torch.randn(1, 3, T, H, W, device="cuda")
+    for T in [4, 52, 100, 148]:
+        video = torch.randn(1, 3, T, H, W, device="cuda", dtype=torch.bfloat16)
         latents = vae.encode(video)
-        print(f"  Input video shape: {video.shape} -> Latent shape: {latents.shape}")
-        print(f"  Latent stats: mean={latents.mean():.4f}, std={latents.std():.4f}")
         video_recon = vae.decode(latents)
-        print(f"  Reconstructed video shape: {video_recon.shape}")
 
-        # Verify shapes
-        expected_T_latent = T // 4
-        expected_H_latent = H // 16
-        expected_W_latent = W // 16
-        assert latents.shape == (1, 48, expected_T_latent, expected_H_latent, expected_W_latent), (
-            f"Expected latent shape (1, 48, {expected_T_latent}, {expected_H_latent}, {expected_W_latent}), "
-            f"got {latents.shape}"
+        expected_T_latent = vae.get_latent_num_frames(T)
+        assert latents.shape == (1, vae.z_dim, expected_T_latent, H // 16, W // 16), (
+            f"T={T}: unexpected latent shape {tuple(latents.shape)}"
         )
+        assert video_recon.shape == (1, 3, T, H, W), f"T={T}: unexpected recon shape {tuple(video_recon.shape)}"
+        print(f"  T={T:3d}  latent={tuple(latents.shape[1:])}  recon={tuple(video_recon.shape[2:])}  OK")
 
 
 @pytest.mark.L0
@@ -81,59 +120,85 @@ def test_uniae_s1():
 )
 @pytest.mark.skipif(os.getenv("RUN_SKIPPED_TEST_LOCALLY") != "1", reason="local_test_only")
 def test_local_video():
-    """Full reconstruction test with a real video — saves output to logs/uniae_recon.mp4."""
+    """Reconstruction test with real video for T in [52,56,...,148]; plots frame-wise PSNR per T."""
+    import matplotlib.pyplot as plt
+
     vae = UniAEVAE(
-        vae_pth=UNIAE_S1_PATH,
+        vae_pth=UNIAE_S3_PATH,
         object_store_credential_path_pretrained=CLUSTER_CONFIG.object_store_credential_pretrained,
         device="cuda",
         dtype=torch.bfloat16,
     )
 
-    # Load video as numpy array (T, H, W, C) in range [0, 255]
-    video_in_numpy = easy_io.load(
+    # Load enough frames to cover all T values
+    T_values = list(range(52, 149, 4))  # 52, 56, ..., 148
+    max_T = max(T_values)
+    video_full = easy_io.load(
         os.path.join(f"s3://{UNITTEST_CONFIG.object_store_bucket_data}", TOKENIZER_RECONSTRUCTION_VIDEO_PATH),
         backend_args={
             "backend": "s3",
             "s3_credential_path": UNITTEST_CONFIG.object_store_credential_data,
         },
-    )[0][:32]  # Take 32 frames (divisible by 4)
+    )[0]  # [T_total, H, W, C]
+    available_T = video_full.shape[0]
+    print(f"\n[UniAE S3] Video loaded: {video_full.shape}, using T up to {min(max_T, available_T)}")
 
-    # Pad video to meet stride alignment requirements
-    padded_video_batch, crop_region = pad_video_batch(
-        video_in_numpy[np.newaxis, ...],  # Add batch dimension
-        temporal_align=4,  # Temporal compression factor
-        spatial_align=16,  # Spatial compression factor
-        causal_mode=False,  # UniAE is non-causal
-        only_pad_end=True,
-    )
+    os.makedirs("logs", exist_ok=True)
+    cmap = plt.get_cmap("viridis")
+    fig, ax = plt.subplots(figsize=(14, 6))
+    mean_psnrs = []
 
-    # Convert to tensor format (B, C, T, H, W) in range [-1, 1]
-    video_tensor = numpy2tensor(padded_video_batch)
+    for i, T in enumerate(T_values):
+        if T > available_T:
+            print(f"  T={T}: skipped (video only has {available_T} frames)")
+            continue
 
-    # Encode and decode
-    print(f"\n[UniAE S1 Local Video] Input tensor shape: {video_tensor.shape}")
-    latents = vae.encode(video_tensor)
-    print(f"[UniAE S1 Local Video] Latent shape: {latents.shape}")
-    print(f"[UniAE S1 Local Video] Latent statistics: mean={latents.mean():.4f}, std={latents.std():.4f}")
-    video_recon = vae.decode(latents)
-    print(f"[UniAE S1 Local Video] Reconstructed shape: {video_recon.shape}")
+        video_in_numpy = video_full[:T]  # [T, H, W, C]
 
-    # Convert back to numpy and unpad
-    video_recon_numpy = tensor2numpy(video_recon)
-    video_recon_unpadded = unpad_video_batch(video_recon_numpy, crop_region)
+        padded_video_batch, crop_region = pad_video_batch(
+            video_in_numpy[np.newaxis, ...],
+            temporal_align=4,
+            spatial_align=16,
+            causal_mode=False,
+            only_pad_end=True,
+        )
+        video_tensor = numpy2tensor(padded_video_batch).cuda()
 
-    # Compute PSNR
-    gt = video_in_numpy[: video_recon_unpadded.shape[1]].astype(np.float32)
-    recon = video_recon_unpadded[0].astype(np.float32)
-    mse = np.mean((gt - recon) ** 2)
-    psnr = 10 * np.log10(255**2 / max(mse, 1e-10))
-    print(f"[UniAE S1 Local Video] PSNR: {psnr:.2f} dB")
+        latents = vae.encode(video_tensor)
+        video_recon = vae.decode(latents)
 
-    # Save reconstruction
-    output_path = os.path.expanduser("logs/uniae_recon.mp4")
-    os.makedirs(os.path.dirname(output_path), exist_ok=True)
-    easy_io.dump(video_recon_unpadded[0].astype("uint8"), output_path)
-    print(f"[UniAE S1 Local Video] Saved reconstruction to: {output_path}")
+        video_recon_numpy = tensor2numpy(video_recon)
+        video_recon_unpadded = unpad_video_batch(video_recon_numpy, crop_region)
+
+        gt = video_in_numpy[: video_recon_unpadded.shape[1]].astype(np.float32)
+        recon = video_recon_unpadded[0].astype(np.float32)
+        mse_per_frame = np.mean((gt - recon) ** 2, axis=(1, 2, 3))
+        psnr_per_frame = 10 * np.log10(255**2 / np.maximum(mse_per_frame, 1e-10))
+        mean_psnr = float(psnr_per_frame.mean())
+        mean_psnrs.append((T, mean_psnr))
+
+        assert mean_psnr >= 30.0, f"T={T}: mean PSNR {mean_psnr:.2f} dB < 30 dB threshold"
+        color = cmap(i / len(T_values))
+        ax.plot(psnr_per_frame, color=color, alpha=0.7, linewidth=0.8, label=f"T={T} ({mean_psnr:.1f}dB)")
+        print(f"  T={T:3d}  latent={tuple(latents.shape[1:])}  mean PSNR={mean_psnr:.2f} dB")
+
+        # Save reconstructed video
+        video_path = f"logs/uniae_s3_recon_T{T:03d}.mp4"
+        easy_io.dump(video_recon_unpadded[0].astype("uint8"), video_path)
+        print(f"    saved {video_path}")
+
+    ax.set_xlabel("Frame index")
+    ax.set_ylabel("PSNR (dB)")
+    ax.set_title("UniAE S3 frame-wise PSNR — real video, T ∈ [52, 148] step 4")
+    ax.legend(loc="upper right", fontsize=6, ncol=4)
+    fig.tight_layout()
+    plot_path = "logs/uniae_s3_local_framewise_psnr.png"
+    fig.savefig(plot_path, dpi=150)
+    plt.close(fig)
+    print(f"\n[UniAE S3] Plot saved to {plot_path}")
+    if mean_psnrs:
+        psnrs = [p for _, p in mean_psnrs]
+        print(f"[UniAE S3] Mean PSNR range: {min(psnrs):.2f} – {max(psnrs):.2f} dB")
 
 
 """
@@ -155,7 +220,7 @@ def test_local_image():
     from PIL import Image
 
     vae = UniAEVAE(
-        vae_pth=UNIAE_S1_PATH,
+        vae_pth=UNIAE_S3_PATH,
         object_store_credential_path_pretrained=CLUSTER_CONFIG.object_store_credential_pretrained,
         device="cuda",
         dtype=torch.bfloat16,
@@ -171,7 +236,7 @@ def test_local_image():
     )[0][0]  # First frame: (H, W, C) in [0, 255]
 
     H, W, C = video_in_numpy.shape
-    print(f"\n[UniAE S1 Image] Original image shape: ({H}, {W}, {C})")
+    print(f"\n[UniAE S3 Image] Original image shape: ({H}, {W}, {C})")
 
     # Pad spatial dimensions to be divisible by 16
     pad_h = (16 - H % 16) % 16
@@ -184,14 +249,14 @@ def test_local_image():
     image_tensor = torch.from_numpy(video_in_numpy).float().permute(2, 0, 1) / 127.5 - 1.0  # (C, H, W)
     image_batch = image_tensor.unsqueeze(0).cuda()  # (1, C, H, W)
 
-    print(f"[UniAE S1 Image] Input tensor shape: {image_batch.shape}")
+    print(f"[UniAE S3 Image] Input tensor shape: {image_batch.shape}")
 
     # Encode and decode (encode handles repeat to 4 frames internally)
     latents = vae.encode(image_batch)
-    print(f"[UniAE S1 Image] Latent shape: {latents.shape}")
-    print(f"[UniAE S1 Image] Latent statistics: mean={latents.mean():.4f}, std={latents.std():.4f}")
+    print(f"[UniAE S3 Image] Latent shape: {latents.shape}")
+    print(f"[UniAE S3 Image] Latent statistics: mean={latents.mean():.4f}, std={latents.std():.4f}")
     video_recon = vae.decode(latents)
-    print(f"[UniAE S1 Image] Reconstructed shape: {video_recon.shape}")
+    print(f"[UniAE S3 Image] Reconstructed shape: {video_recon.shape}")
 
     # Take the first frame as reconstructed image
     recon_image = video_recon[0, :, 0].clamp(-1, 1)  # (C, H, W)
@@ -205,7 +270,7 @@ def test_local_image():
     recon_f = recon_numpy.astype(np.float32)
     mse = np.mean((gt - recon_f) ** 2)
     psnr = 10 * np.log10(255**2 / max(mse, 1e-10))
-    print(f"[UniAE S1 Image] PSNR: {psnr:.2f} dB")
+    print(f"[UniAE S3 Image] PSNR: {psnr:.2f} dB")
 
     # Save original and reconstruction side by side
     output_path = os.path.expanduser("logs/uniae_image_recon.png")
@@ -216,4 +281,4 @@ def test_local_image():
     side_by_side.paste(orig_img, (0, 0))
     side_by_side.paste(recon_img, (W + 10, 0))
     side_by_side.save(output_path)
-    print(f"[UniAE S1 Image] Saved side-by-side to: {output_path}")
+    print(f"[UniAE S3 Image] Saved side-by-side to: {output_path}")

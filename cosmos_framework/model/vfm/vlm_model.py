@@ -124,7 +124,7 @@ def _get_overlay_config(model_type: str) -> tuple[list[str], Callable[[str], boo
 
 def _get_vision_encoder_modules(model: nn.Module, model_type: str) -> list:
     if model_type in _QWEN_VL_TYPES:
-
+        # NOTE: intentional semantic change from `model_utils.get_model_vision_encoder`,
         # which returns only [patch_embed, blocks]. Qwen3-VL adds a learnable `pos_embed`
         # (nn.Embedding — see qwen3_vl.py Qwen3VLVisionModel); leaving it trainable while
         # freezing the rest of the vision encoder contradicts the intent of
@@ -395,18 +395,8 @@ class VLMModel(ImaginaireModel):
 
         # ── g. Load pretrain weights ──
         if load_pretrain_weights:
-            if policy.backbone.safetensors_path:
-                safetensors_local_path = maybe_download_hf_model_from_s3(
-                    policy.backbone.safetensors_path,
-                    checkpoint.load_from_object_store.credentials,
-                    checkpoint.load_from_object_store.bucket,
-                    include_model_weights=True,
-                )
-            else:
-                safetensors_local_path = local_path
-
             hf_model.load_weights(
-                checkpoint_path=safetensors_local_path,
+                checkpoint_path=local_path,
                 credential_path=None,  # local path after download
                 parallel_dims=parallel_dims if torch.distributed.is_initialized() else None,
             )

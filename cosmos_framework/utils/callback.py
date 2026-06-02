@@ -19,6 +19,10 @@ from cosmos_framework.utils.lazy_config import instantiate
 from cosmos_framework.utils import distributed, log, misc, wandb_util
 from cosmos_framework.utils.misc import get_local_tensor_if_DTensor
 
+# COSMOS-RELEASE-BEGIN-IGNORE: remove one_logger
+from cosmos_framework.utils.one_logger.one_logger_utils import get_one_logger
+
+# COSMOS-RELEASE-END-IGNORE
 
 try:
     from megatron.core import parallel_state
@@ -391,7 +395,7 @@ class IterationLoggerCallback(Callback):
         loss: torch.Tensor,
         iteration: int = 0,
     ) -> None:
-
+        # FIXME - this is not correct when using gradient accumulation since self.start_iteration_time is updated every batch
         # but this is only called when the optimizer is updated, so it's only the time for the last batch.
         self.elapsed_iteration_time += time.time() - self.start_iteration_time
 
@@ -600,3 +604,104 @@ class NVTXCallback(Callback):
         torch.cuda.nvtx.range_pop()
 
 
+# COSMOS-RELEASE-BEGIN-IGNORE
+class OneLoggerCallback(Callback):
+    """Callback for OneLogger"""
+
+    def __init__(
+        self,
+        config: Optional["Config"] = None,
+        trainer: Optional["ImaginaireTrainer"] = None,
+    ) -> None:
+        super().__init__(config, trainer)
+
+        self.one_logger = get_one_logger()
+        self.one_logger.on_app_start(set_barrier=False, app_start_time=round(time.time() * 1000))
+
+    def on_train_start(self, model: ImaginaireModel, iteration: int = 0) -> None:
+        try:
+            batch_size = self.config.dataloader_train.batch_size
+        except Exception:
+            batch_size = 1
+        if parallel_state is None or not parallel_state.is_initialized():
+            data_parallel_size = 1
+        else:
+            data_parallel_size = parallel_state.get_data_parallel_world_size()
+        global_batch_size = batch_size * data_parallel_size
+
+        self.one_logger.on_train_start(
+            set_barrier=False,
+            train_iterations_start=iteration,
+            train_samples_start=iteration * global_batch_size,
+        )
+
+    def on_training_step_batch_start(
+        self, model: ImaginaireModel, data: dict[str, torch.Tensor], iteration: int = 0
+    ) -> None:
+        self.one_logger.on_train_batch_start(set_barrier=False)
+
+    def on_optimizer_init_start(self) -> None:
+        self.one_logger.on_optimizer_init_start(set_barrier=False)
+
+    def on_optimizer_init_end(self) -> None:
+        self.one_logger.on_optimizer_init_end(set_barrier=False)
+
+    def on_training_step_batch_end(
+        self,
+        model: ImaginaireModel,
+        data_batch: dict[str, torch.Tensor],
+        output_batch: dict[str, torch.Tensor],
+        loss: torch.Tensor,
+        iteration: int = 0,
+    ) -> None:
+        self.one_logger.on_train_batch_end(set_barrier=False)
+
+    def on_validation_start(
+        self, model: ImaginaireModel, dataloader_val: torch.utils.data.DataLoader, iteration: int = 0
+    ) -> None:
+        self.one_logger.on_validation_start(set_barrier=False)
+
+    def on_validation_step_start(
+        self, model: ImaginaireModel, data: dict[str, torch.Tensor], iteration: int = 0
+    ) -> None:
+        self.one_logger.on_validation_batch_start(set_barrier=False)
+
+    def on_validation_step_end(
+        self,
+        model: ImaginaireModel,
+        data_batch: dict[str, torch.Tensor],
+        output_batch: dict[str, torch.Tensor],
+        loss: torch.Tensor,
+        iteration: int = 0,
+    ) -> None:
+        self.one_logger.on_validation_batch_end(set_barrier=False)
+
+    def on_validation_end(self, model: ImaginaireModel, iteration: int = 0) -> None:
+        self.one_logger.on_validation_end(set_barrier=False)
+
+    def on_load_checkpoint_start(self, model: ImaginaireModel) -> None:
+        self.one_logger.on_load_checkpoint_start(set_barrier=False)
+
+    def on_load_checkpoint_end(
+        self, model: ImaginaireModel, iteration: int = 0, checkpoint_path: Optional[str] = None
+    ) -> None:
+        self.one_logger.on_load_checkpoint_end(set_barrier=False)
+
+    def on_save_checkpoint_start(self, model: ImaginaireModel, iteration: int = 0) -> None:
+        self.one_logger.on_save_checkpoint_start(global_step=iteration)
+
+    def on_save_checkpoint_end(self, model: ImaginaireModel, iteration: int = 0) -> None:
+        self.one_logger.on_save_checkpoint_end(global_step=iteration)
+
+    def on_save_checkpoint_success(self, iteration: int = 0, elapsed_time: float = 0) -> None:
+        self.one_logger.on_save_checkpoint_success(global_step=iteration)
+
+    def on_train_end(self, model: ImaginaireModel, iteration: int = 0) -> None:
+        self.one_logger.on_train_end(set_barrier=False)
+
+    def on_app_end(self) -> None:
+        self.one_logger.on_app_end()
+        self.one_logger.finish()
+
+
+# COSMOS-RELEASE-END-IGNORE

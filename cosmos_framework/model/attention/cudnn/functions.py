@@ -55,6 +55,10 @@ class CudnnAttentionAutogradFn(Function):
         padding_Q = 0
         padding_KV = 0
 
+        # COSMOS-RELEASE-BEGIN-IGNORE
+        # but as of 11/12/2025 does not seem to fix any issues. Keeping here in case
+        # it ever comes back.
+        # COSMOS-RELEASE-END-IGNORE
         if CUDNN_PADDING_REQUIRED:
             Q_multiplier = 256
             KV_multiplier = 256
@@ -235,7 +239,6 @@ def cudnn_attention(
         deterministic=deterministic,
         raise_error=True,
     )
-
 
     assert not is_varlen  # cudnn_attention_check should prevent this assertion failing
 

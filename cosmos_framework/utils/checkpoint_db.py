@@ -57,7 +57,7 @@ import subprocess
 import uuid
 from abc import ABC, abstractmethod
 from pathlib import Path
-from typing import Annotated, Callable, TypeAlias
+from typing import Annotated, TypeAlias
 
 import pydantic
 from typing_extensions import Self, override
@@ -148,6 +148,8 @@ def _hf_download(cmd_args: list[str]) -> str:
     is_rank0 = os.environ.get("RANK", "0") == "0"
     cmd = [
         "uvx",
+        "--with",
+        "click",
         f"hf@{HF_VERSION}",
         "download",
         "--format=json",
@@ -268,7 +270,7 @@ CheckpointHf: TypeAlias = CheckpointFileHf | CheckpointDirHf
 class CheckpointConfig(pydantic.BaseModel):
     """Config for checkpoint."""
 
-    model_config = pydantic.ConfigDict(extra="forbid", frozen=True, arbitrary_types_allowed=True)
+    model_config = pydantic.ConfigDict(extra="forbid", frozen=True)
 
     uuid: str
     """Checkpoint UUID."""
@@ -292,15 +294,6 @@ class CheckpointConfig(pydantic.BaseModel):
     hf: CheckpointHf
     """Config for checkpoint on Hugging Face."""
 
-    post_download: Callable[[str], None] | None = pydantic.Field(default=None, exclude=True)
-    """Optional callback invoked with the local path after a successful download.
-
-    Used to materialize derived artifacts inside the cache directory so downstream
-    loaders see the expected file layout (e.g. wrap a safetensors export back into
-    a legacy ``.ckpt`` for loaders that only read ``torch.load`` checkpoints).
-    Must be idempotent — invoked on every ``download()`` call.
-    """
-
     @property
     def full_name(self) -> str:
         """Return full name for debugging."""
@@ -311,17 +304,8 @@ class CheckpointConfig(pydantic.BaseModel):
         if INTERNAL:
             return self.s3.uri
 
-        include = getattr(self.hf, "include", ())
-        if include:
-            _config_patterns = {"*.json", "*.txt", "*.yaml", "*.yml", "*.md"}
-            kind = "tokenizer/config files" if set(include).issubset(_config_patterns) else "files"
-            log.info(f"Downloading {self.hf.repository} {kind} ({', '.join(include)})")
-        else:
-            log.info(f"Downloading checkpoint {self.full_name}")
-        path = self.hf.download()
-        if self.post_download is not None:
-            self.post_download(path)
-        return path
+        log.info(f"Downloading checkpoint {self.full_name}")
+        return self.hf.download()
 
     @classmethod
     def maybe_from_uri(cls, uri: str) -> Self | None:
@@ -441,11 +425,6 @@ def download_checkpoint_v2(checkpoint_uri: str, *, check_exists: bool = True) ->
 
     Similar to 'download_checkpoint', but unknown S3 URIs are passed through.
     """
-    # Local-path short-circuit: if the URI exists on disk, return it as-is
-    # without consulting the registry. Prevents the registry from rewriting
-    # a known basename (e.g. Wan2.2_VAE.pth) into an s3:// URI we can't open.
-    if os.path.exists(checkpoint_uri):
-        return checkpoint_uri
     if INTERNAL:
         return checkpoint_uri
     if (checkpoint := CheckpointConfig.maybe_from_uri(sanitize_uri(checkpoint_uri))) is not None:

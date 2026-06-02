@@ -39,7 +39,7 @@ class NVLMImageDataUnify(Augmentor):
         output_keys: Optional[list] = [],
         args: Optional[dict] = None,
         data_path_prefix: list[str] = [
-            "cosmos_framework/ar/v2/nvlm/",
+            "cosmos/ar/v2/nvlm/",
         ],  # prefix of the data in s3
     ) -> None:
         super().__init__(input_keys, output_keys, args)

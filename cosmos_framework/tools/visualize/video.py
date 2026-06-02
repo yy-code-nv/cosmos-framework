@@ -13,19 +13,16 @@ from cosmos_framework.utils.easy_io import easy_io
 
 
 def save_video(grid, video_name, fps=30):
-    import imageio
+    import cv2
+    import ffmpegcv
 
     grid = (grid * 255).astype(np.uint8)
     grid = np.transpose(grid, (1, 2, 3, 0))
-    imageio.mimsave(
-        video_name,
-        list(grid),
-        format="mp4",
-        fps=float(fps),
-        codec="libx264",
-        pixelformat="yuv420p",
-        macro_block_size=1,
-    )
+    with ffmpegcv.VideoWriter(video_name, "h264", fps) as writer:
+        for frame in grid:
+            frame = cv2.cvtColor(frame, cv2.COLOR_RGB2BGR)
+
+            writer.write(frame)
 
 
 def save_img_or_video(

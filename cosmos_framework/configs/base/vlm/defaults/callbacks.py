@@ -12,7 +12,7 @@ from cosmos_framework.utils.lazy_config import PLACEHOLDER
 from cosmos_framework.utils.lazy_config import LazyCall as L
 from cosmos_framework.utils.callback import LowPrecisionCallback, WandBCallback
 from cosmos_framework.callbacks.dataloader_state import DataLoaderStateCallback
-
+from cosmos_framework.callbacks.dataloading_monitor import DetailedDataLoadingSpeedMonitor
 from cosmos_framework.callbacks.grad_clip import GradClip
 from cosmos_framework.callbacks.hf_export import HFExportCallback
 from cosmos_framework.callbacks.iter_speed import IterSpeed
@@ -40,6 +40,10 @@ def register_callbacks():
         param_count=L(ParamCount)(  # use model
             save_s3="${upload_reproducible_setup}",
         ),
+        dataloader_speed=L(DetailedDataLoadingSpeedMonitor)(
+            every_n=100,
+            save_s3="${upload_reproducible_setup}",
+        ),
         grad_clip=L(GradClip)(clip_norm=1.0, force_finite=False),  # use model
         learning_rate_logger=L(LearningRateLogger)(every_n=10),
         low_precision=L(LowPrecisionCallback)(
@@ -47,7 +51,6 @@ def register_callbacks():
             config=PLACEHOLDER,
             trainer=PLACEHOLDER,
         ),  # reads model.precision; no extra kwarg needed
-
         # nvtx=L(NVTXCallback)(synchronize=True),
     )
 

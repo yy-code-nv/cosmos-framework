@@ -33,7 +33,8 @@ class CredentialEnvParser(EnvParser):
     PROD_TEAM_DIR_REGION_NAME = String(default="")
 
     PICASSO_AUTH_MODEL_REGISTRY_API_KEY = String(default="")
-    PICASSO_API_ENDPOINT_URL = String(default="https://invalid")
+    # COSMOS-RELEASE-REPLACE-NEXT: '"https://.*"' '"https://invalid"'
+    PICASSO_API_ENDPOINT_URL = String(default="https://meeocvslt2.execute-api.us-west-2.amazonaws.com")
 
 
 CRED_ENVS = CredentialEnvParser()

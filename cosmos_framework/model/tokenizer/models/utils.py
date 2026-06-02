@@ -10,7 +10,7 @@ This module provides general-purpose utilities:
     - Temporal utilities: split_temporal_dimension, restore_original_shape,
       reconstruct_from_temporal_slices
 
-Note: Metrics like calculate_psnr have been moved to projects.cosmos3.tokenizer.evaluation.reconstruction_metrics
+Note: Metrics like calculate_psnr have been moved to cosmos_framework.model.tokenizer.evaluation.reconstruction_metrics
 """
 
 from __future__ import annotations
@@ -561,7 +561,7 @@ def resize_and_crop(
 # =============================================================================
 # Logging
 # =============================================================================
-# Note: calculate_psnr has been moved to projects.cosmos3.tokenizer.evaluation.reconstruction_metrics
+# Note: calculate_psnr has been moved to cosmos_framework.model.tokenizer.evaluation.reconstruction_metrics
 # =============================================================================
 
 
