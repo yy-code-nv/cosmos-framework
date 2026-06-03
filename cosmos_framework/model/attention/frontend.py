@@ -28,11 +28,6 @@ from cosmos_framework.model.attention.natten import natten_attention, natten_mul
 from cosmos_framework.model.attention.utils.environment import filter_attention_merge_backends
 from cosmos_framework.model.attention.utils.safe_ops import log
 
-# COSMOS-RELEASE-BEGIN-IGNORE
-# isort: split
-from cosmos_framework.model.attention.cudnn import cudnn_attention
-
-# COSMOS-RELEASE-END-IGNORE
 
 # Map backend names to their frontend attention API
 BACKEND_MAP = {

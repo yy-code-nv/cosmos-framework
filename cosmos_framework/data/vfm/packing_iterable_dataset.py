@@ -1,12 +1,5 @@
-# -----------------------------------------------------------------------------
-# Copyright (c) 2025 NVIDIA CORPORATION & AFFILIATES.
-# All rights reserved.
-#
-# This codebase constitutes NVIDIA proprietary technology and is strictly
-# confidential. Any unauthorized reproduction, distribution, or disclosure
-# of this code, in whole or in part, without express written consent of
-# NVIDIA is strictly prohibited.
-# -----------------------------------------------------------------------------
+# SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# SPDX-License-Identifier: OpenMDW-1.1
 
 """
 Abstract base class for pool-based token-budget bin-packing over multiple datasets.

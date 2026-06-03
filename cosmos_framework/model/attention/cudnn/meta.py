@@ -30,9 +30,6 @@ def get_fwd_dtypes(arch_tag: int) -> list[torch.dtype]:
         log.debug("cuDNN Attention is not supported because compute capability is below the minimum (8.0).")
         return []
 
-    # COSMOS-RELEASE-BEGIN-IGNORE
-    ## not seem to work.
-    # COSMOS-RELEASE-END-IGNORE
     log.debug(f"cuDNN Attention only supports FP16 and BF16 for {arch_tag=}.")
     return [torch.float16, torch.bfloat16]
 

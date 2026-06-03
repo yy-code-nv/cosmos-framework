@@ -365,15 +365,6 @@ def _test_attention_impls(
         )
 
 
-# COSMOS-RELEASE-BEGIN-IGNORE
-# because we need GQA support, varlen, torch.compile, and we need it across architectures.
-# Flash3 + torch.compile is banned because our container build of Flash3 doesn't support it, and
-# patching on our end and lack of versioning on their end makes it very difficult to check for this
-# at runtime.
-# Flash2 varlen introduces instability in Blackwell, and is therefore banned.
-# cuDNN is banned entirely until it can pass our tests.
-# NATTEN must meet the version requirements for all the features to be available.
-# COSMOS-RELEASE-END-IGNORE
 @pytest.mark.L0
 @pytest.mark.skipif(not NATTEN_SUPPORTED, reason="NATTEN is not available, or too old.")
 def test_two_way_attention_cmp_flex_attn():

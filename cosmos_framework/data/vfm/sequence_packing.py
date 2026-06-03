@@ -2246,11 +2246,6 @@ def generate_natten_metadata(
             over layers (nn.ModuleList).
     """
 
-    # COSMOS-RELEASE-BEGIN-IGNORE
-    # sequence-packed tensors containing only and exactly subsequences with sizes from
-    # token_shapes, in the same order, and with no padding in between.
-    # We should either make sure this never happens, or have static checks in place.
-    # COSMOS-RELEASE-END-IGNORE
 
     if token_shapes is None or len(token_shapes) < 1:
         raise ValueError("'token_shapes' is required for 'three_way' attention.")
@@ -2273,11 +2268,6 @@ def generate_natten_metadata(
             return tuple(x for x in shape if x > 1)
 
         # Infer token layout rank (dimensionality)
-        # COSMOS-RELEASE-BEGIN-IGNORE
-        # compresses that dimension into size 1, which gets filtered out. To avoid failing checks
-        # we need to take the maximum dimensionality over the entire batch. We'll assert each token
-        # shape matches that dimensionality later, if NATTEN is required for this batch.
-        # COSMOS-RELEASE-END-IGNORE
         num_dims = max([len(filter_shape(token_shape)) for token_shape in token_shapes])
 
         # Single pass: check if all layers support this dimensionality and if any need processing

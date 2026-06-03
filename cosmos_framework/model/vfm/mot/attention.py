@@ -98,16 +98,6 @@ def two_way_attention(
 
     sample_offsets = packed_query_states["sample_offsets"]
 
-    # COSMOS-RELEASE-BEGIN-IGNORE
-    # NOTE: we can only use the don't care causal mask when we know seqlen_Q == seqlen_KV.
-    # Since this is a varlen use case, we would need to statically check all Q and KV offsets
-    # are the same.
-    # We don't want to launch a kernel just to perform this check and slow down our model,
-    # and we don't want to just assume no one is going to copy this piece of code without
-    # reading this, and we definitely don't want to complicate the sequence_packing code so that
-    # it performs a static check when creating the packed sequence and metadata, so we can just rely
-    # on causal_q_offsets and causal_k_offsets being the same tensor.
-    # COSMOS-RELEASE-END-IGNORE
     use_dont_care_mask = causal_q_offsets is causal_k_offsets
 
     # NOTE: cosmos_framework attention is BSHD in, BSHD out
@@ -186,16 +176,6 @@ def three_way_attention(
         ).reshape(-1)
         full_v[null_positions] = 0
 
-    # COSMOS-RELEASE-BEGIN-IGNORE
-    # NOTE: we can only use the don't care causal mask when we know seqlen_Q == seqlen_KV.
-    # Since this is a varlen use case, we would need to statically check all Q and KV offsets
-    # are the same.
-    # We don't want to launch a kernel just to perform this check and slow down our model,
-    # and we don't want to just assume no one is going to copy this piece of code without
-    # reading this, and we definitely don't want to complicate the sequence_packing code so that
-    # it performs a static check when creating the packed sequence and metadata, so we can just rely
-    # on causal_q_offsets and causal_k_offsets being the same tensor.
-    # COSMOS-RELEASE-END-IGNORE
     use_dont_care_mask = causal_q_offsets is causal_k_offsets
 
     # NOTE: cosmos_framework attention is BSHD in, BSHD out

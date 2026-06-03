@@ -13,12 +13,6 @@ import torch
 from cosmos_framework.model.attention.utils.safe_ops import log
 from cosmos_framework.model.attention.utils.version import version_at_least
 
-# COSMOS-RELEASE-BEGIN-IGNORE
-# (ahassani) [11-20-2025] Banning cuDNN until reliability issues are resolved.
-# Versions checked: 91300, 91400, 91500
-# (ahassani) [12-01-2025]
-# 91500 ran on both GB200 and H100 SXM.
-# COSMOS-RELEASE-END-IGNORE
 CUDNN_DISALLOWED = True
 
 CUDNN_MIN_BACKEND_VERSION = 91300
