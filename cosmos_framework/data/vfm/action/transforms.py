@@ -19,6 +19,7 @@ from __future__ import annotations
 import torch
 import torchvision.transforms.functional as transforms_F
 
+from cosmos_framework.utils import log
 from cosmos_framework.data.vfm.action.json_formatter import ActionPromptJsonFormatter
 from cosmos_framework.data.vfm.action.viewpoint_utils import ViewpointTextInfo
 from cosmos_framework.data.vfm.augmentors.duration_fps_text_timestamps import DurationFPSTextTimeStamps
@@ -27,7 +28,6 @@ from cosmos_framework.data.vfm.augmentors.resolution_text_info import Resolution
 from cosmos_framework.data.vfm.augmentors.text_tokenizer import TextTokenizerTransform
 from cosmos_framework.data.vfm.sequence_packing import SequencePlan
 from cosmos_framework.data.vfm.utils import VIDEO_RES_SIZE_INFO
-from cosmos_framework.utils import log
 from cosmos_framework.utils.vfm.data_utils import get_vision_data_resolution
 
 
@@ -309,7 +309,6 @@ def build_sequence_plan_from_mode(
     base_action_length = action_length - num_history_actions
     if mode == "forward_dynamics":
         condition_frame_indexes_action = list(range(action_length))
-
     # This currently assumes that the action length is the same as the video length - 1
     # and if action length is the same as the video length, then the first action is the conditioning action
     elif base_action_length == video_length - 1:

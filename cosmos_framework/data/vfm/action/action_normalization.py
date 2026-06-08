@@ -27,7 +27,7 @@ def load_action_stats(stats_path: str, stats_key: str = "global") -> dict[str, n
     elif stats_key != "global":
         raise KeyError(f"Action normalization stats block {stats_key!r} not found in {stats_path}.")
     stat_keys = {"mean", "std", "min", "max", "q01", "q99"}
-    return {key: np.array(value, dtype=np.float32) for key, value in raw.items() if key in stat_keys}
+    return {k: np.array(v, dtype=np.float32) for k, v in raw.items() if k in stat_keys}
 
 
 def normalize_action(
@@ -35,7 +35,7 @@ def normalize_action(
     method: str,
     stats: dict[str, torch.Tensor],
 ) -> torch.Tensor:
-    """Normalize action tensor."""
+    """Normalize action tensor (all dimensions including gripper)."""
     if method == "quantile":
         q01, q99 = stats["q01"], stats["q99"]
         denom = (q99 - q01).clamp(min=1e-8)

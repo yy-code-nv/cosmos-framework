@@ -882,7 +882,7 @@ class Cosmos3VFMNetwork(PreTrainedModel):
         packed_tokens_sound = packed_tokens_sound.to(target_dtype)  # [total_sound_tokens,sound_dim]
 
         # Project sound tokens + modality embedding
-
+        # NOTE: Sound position info comes from m-RoPE position IDs in the attention layers.
         # No additive position embedding is used (unlike legacy video which keeps one for backward compat).
         packed_tokens_sound = (
             self.sound2llm(packed_tokens_sound) + self.sound_modality_embed

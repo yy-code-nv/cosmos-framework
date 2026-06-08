@@ -4,13 +4,17 @@
 """
 Abstract base class for pool-based token-budget bin-packing over multiple datasets.
 
-Extracted from ``projects.cosmos3.vfm.datasets.vlm.joint_dataset_dynamic_batch_webloader``
+Extracted from ``cosmos_framework.data.vfm.vlm.joint_dataset_dynamic_batch_webloader``
 so that both the VLM and VFM internal dataloaders can share a single packing implementation.
 
 Usage
 -----
 Subclass and implement ``compute_sample_tokens(sample) -> int``.
 Optionally override ``collate_batch(samples) -> Any`` for custom collation.
+
+    class MyPacker(PackingIterableDataset):
+        def compute_sample_tokens(self, sample):
+            return len(sample["input_ids"])
 """
 
 from __future__ import annotations
@@ -62,11 +66,6 @@ class PackingIterableDataset(torch.utils.data.IterableDataset, ABC):
         singletons regardless of budget.
     batching_strategy:
         ``"prefer_closest"`` (default) or ``"prefer_first"``.
-    apply_long_sample_halving:
-        When ``True`` (default), ``_max_tokens`` halves the budget for any
-        batch whose largest sample exceeds 1000 tokens — a memory-safety
-        heuristic. Set ``False`` only when memory headroom at the literal
-        ``max_tokens`` budget has been validated for the recipe.
     """
 
     def __init__(
@@ -77,7 +76,6 @@ class PackingIterableDataset(torch.utils.data.IterableDataset, ABC):
         max_batch_size: int,
         long_threshold: int,
         batching_strategy: str,
-        apply_long_sample_halving: bool = True,
     ):
         super().__init__()
 
@@ -90,7 +88,6 @@ class PackingIterableDataset(torch.utils.data.IterableDataset, ABC):
         self.long_threshold = long_threshold
         self.max_batch_size = max_batch_size
         self.batching_strategy = batching_strategy
-        self.apply_long_sample_halving = apply_long_sample_halving
 
         self._pool: deque[dict] = deque()
         self._dataset_names: list[str] = []
@@ -166,8 +163,6 @@ class PackingIterableDataset(torch.utils.data.IterableDataset, ABC):
     # ------------------------------------------------------------------
 
     def _max_tokens(self, cur_max: int) -> int:
-        if not self.apply_long_sample_halving:
-            return self.max_tokens
         if cur_max < 1000:
             return self.max_tokens
         return self.max_tokens // 2

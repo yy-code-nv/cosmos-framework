@@ -57,7 +57,6 @@ def custom_collate_fn(batch):
     # Handle standard list of samples
     elem = batch[0]
     if isinstance(elem, dict):
-
         # Some Action datasets add optional metadata keys (for example
         # ``additional_view_description`` for concat-view captions) only for a
         # subset of samples.  PyTorch can batch such samples together when
@@ -261,7 +260,7 @@ class JointDataLoader(webdataset.WebLoader):
         The first ``next()`` call on an ``InfiniteDataLoader`` iterator triggers
         ``DataLoader.__iter__()`` which spawns worker processes.  For action
         dataloaders using ``multiprocessing_context='spawn'``, each worker must
-        fully initialise heavy datasets (BridgeOrigLeRobotDataset, EMBODIMENT_A, etc.)
+        fully initialise heavy datasets (BridgeOrigLeRobotDataset, embodiment_a, etc.)
         from scratch.  If this happens lazily during training, the resulting
         delay (potentially minutes) causes NCCL collective timeouts when faster
         ranks enter the forward pass while slower ranks are still loading data.

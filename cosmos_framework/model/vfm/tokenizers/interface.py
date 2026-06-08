@@ -87,8 +87,12 @@ class VideoTokenizerInterface(ABC):
         warmup_resolutions: Sequence[str],
         output_dir: str,
         aspect_ratio: str | None = None,
+        backend: str | None = None,
+        mode: str | None = None,
+        fullgraph: bool | None = None,
+        dynamic: bool | None = None,
     ) -> None:
-        """AOT-compile the tokenizer for the given resolutions.
+        """Compile the tokenizer for the given resolutions.
 
         Subclasses that support AOT compilation should override this method.
         The default raises ``NotImplementedError``.
@@ -98,6 +102,11 @@ class VideoTokenizerInterface(ABC):
             output_dir: Root directory where compiled artifacts are stored
                 (typically ``config.job.path_local``).
             aspect_ratio: If given, only compile this single aspect ratio.
+            --- Only used if the tokenizer does not support AOT compilation ---
+            backend: Backend to use for compilation.
+            mode: Mode to use for compilation.
+            fullgraph: Whether to compile the full graph.
+            dynamic: Whether to compile the dynamic graph.
         """
         raise NotImplementedError(f"{type(self).__name__} does not support compilation")
 
@@ -106,8 +115,9 @@ class VideoTokenizerInterface(ABC):
         return False
 
     @property
-    def is_causal(self):
-        return True
+    def is_causal(self) -> bool:
+        # Subclasses set self._causal in their __init__ via the `causal` constructor argument.
+        return getattr(self, "_causal", True)
 
 
 class AudioTokenizerInterface(ABC):

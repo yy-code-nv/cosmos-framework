@@ -100,7 +100,7 @@ def two_way_attention(
 
     use_dont_care_mask = causal_q_offsets is causal_k_offsets
 
-
+    # NOTE: cosmos_framework attention is BSHD in, BSHD out
     causal_res = attention(
         causal_q.unsqueeze(0),  # [1,N_und,heads,head_dim]
         causal_k.unsqueeze(0),  # [1,N_und,heads,head_dim]
@@ -178,7 +178,7 @@ def three_way_attention(
 
     use_dont_care_mask = causal_q_offsets is causal_k_offsets
 
-
+    # NOTE: cosmos_framework attention is BSHD in, BSHD out
     causal_res = attention(
         causal_q.unsqueeze(0),  # [1,N_und,heads,head_dim]
         causal_k.unsqueeze(0),  # [1,N_und,heads,head_dim]

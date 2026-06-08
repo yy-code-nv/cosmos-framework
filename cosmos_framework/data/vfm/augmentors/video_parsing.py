@@ -345,7 +345,7 @@ class VideoParsing(Augmentor):
         video_info["video"] = video_frames
         video_info["num_multiplier"] = num_multiplier  # Store the frame skipping multiplier
 
-
+        # NOTE: Explaining the logic of conditioning FPS calculation:
         # 1. Our video parser stores the original video FPS of the video.
         # 2. We have multiple modes of frame selection -- consecutive chunk of frames or subsampled frames.
         # Here's what we do in each case:
@@ -434,6 +434,20 @@ class VideoParsingWithFullFrames(Augmentor):
         self.dataset_resolution_type = args.get("dataset_resolution_type", "all")
         self.resolution_tier = _DATASET_RESOLUTION_TIER.get(self.dataset_resolution_type)
 
+        # VAE temporal alignment mode.
+        # causal_vae=True  (default): align to 1+4N (causal VAE, e.g. Wan 2.2)
+        # causal_vae=False: align to 4N (non-causal VAE, e.g. UniAE)
+        self.causal_vae = args.get("causal_vae", True)
+        self.uniae_pad_frames = args.get("uniae_pad_frames", None)
+        self.uniae_chunk_frames = args.get("uniae_chunk_frames", None)
+        if self.uniae_chunk_frames is not None:
+            assert self.uniae_pad_frames is not None, (
+                "uniae_pad_frames must be specified if uniae_chunk_frames is specified"
+            )
+            assert self.uniae_chunk_frames > 2 * self.uniae_pad_frames, (
+                "uniae_chunk_frames must be greater than 2 * uniae_pad_frames"
+            )
+
     def _sample_stride_with_bias(self, max_stride: int, min_stride: int = 1) -> int:
         """Sample a stride from [min_stride, max_stride] with bias controlled by low_fps_bias.
 
@@ -520,7 +534,6 @@ class VideoParsingWithFullFrames(Augmentor):
         return True
 
     def __call__(self, data_dict: dict) -> dict | None:
-
         # if in future we need to train with batch size > 1, need to pad frames
         try:
             meta_dict = data_dict[self.meta_key]
@@ -569,11 +582,35 @@ class VideoParsingWithFullFrames(Augmentor):
             stride = self._sample_stride_with_bias(self.max_stride, self.min_stride)
             frame_indices = np.arange(0, num_video_frames, stride).tolist()
 
-            # VAE compress temporal by 4x, with 1 as condition
-            # thus the max_video_frames must be 1 + 4N
+            # Align frame count to VAE temporal compression requirement.
+            # causal_vae=True:  1+4N  (causal VAE, e.g. Wan 2.2)
+            # causal_vae=False: 4N    (non-causal VAE, e.g. UniAE)
             num_video_frames = min(len(frame_indices), self.args.get("max_num_frames", 1000))
-            N = (num_video_frames - 1) // 4
-            num_video_frames = 1 + 4 * N
+            if self.causal_vae:
+                N = (num_video_frames - 1) // 4
+                num_video_frames = 1 + 4 * N
+            else:
+                # If this is UniAE, we need to align the frame count to the chunk size and padding.
+                if self.uniae_chunk_frames is not None:
+                    # trim excess frames
+                    effective_chunk_frames = self.uniae_chunk_frames - 2 * self.uniae_pad_frames
+                    while (
+                        num_video_frames % effective_chunk_frames != 0
+                        and (num_video_frames % effective_chunk_frames + 2 * self.uniae_pad_frames) % 4 != 0
+                        and num_video_frames > 0
+                    ):
+                        num_video_frames -= 1
+
+                    if num_video_frames == 0:
+                        log.warning(
+                            f"VideoParsingWithFullFrames: video too short for UniAE. "
+                            f"url: {data_dict['__url__']}, key: {data_dict['__key__']}",
+                            rank0_only=False,
+                        )
+                        return None
+                else:
+                    N = num_video_frames // 4
+                    num_video_frames = 4 * N
             frame_indices = frame_indices[0:num_video_frames]
 
             frame_batch = video_decoder.get_frames_at(frame_indices)
@@ -698,7 +735,6 @@ class VideoParsingChunkedFrames(VideoParsingWithFullFrames):
         super().__init__(input_keys, output_keys, args)
 
     def __call__(self, data_dict: dict) -> dict | None:
-
         # if in future we need to train with batch size > 1, need to pad frames
         try:
             meta_dict = data_dict[self.meta_key]
@@ -772,11 +808,16 @@ class VideoParsingChunkedFrames(VideoParsingWithFullFrames):
             stride = self._sample_stride_with_bias(self.max_stride, self.min_stride)
             frame_indices = np.arange(chunk_start_clamped, chunk_end_clamped, stride).tolist()
 
-            # VAE compress temporal by 4x, with 1 as condition
-            # thus the max_video_frames must be 1 + 4N
+            # Align frame count to VAE temporal compression requirement.
+            # causal_vae=True:  1+4N  (causal VAE, e.g. Wan 2.2)
+            # causal_vae=False: 4N    (non-causal VAE, e.g. UniAE)
             num_video_frames = min(len(frame_indices), self.args.get("max_num_frames", 1000))
-            N = (num_video_frames - 1) // 4
-            num_video_frames = 1 + 4 * N
+            if self.causal_vae:
+                N = (num_video_frames - 1) // 4
+                num_video_frames = 1 + 4 * N
+            else:
+                N = num_video_frames // 4
+                num_video_frames = 4 * N
             if num_video_frames < 1:
                 log.warning(
                     f"VideoParsingChunkedFrames: chunk too short for stride. "

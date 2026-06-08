@@ -6,7 +6,6 @@ from typing import List, Tuple
 
 IMAGE_RES_SIZE_INFO: dict[str, dict[str, tuple[int, int]]] = {
     # Our desired 256 resolution is the one below (commented).
-
     # Desired: "256": {"1,1": (336, 336), "4,3": (384, 288), "3,4": (288, 384), "16,9": (448, 256), "9,16": (256, 448)},
     "256": {
         "1,1": (256, 256),
@@ -41,7 +40,6 @@ IMAGE_RES_SIZE_INFO: dict[str, dict[str, tuple[int, int]]] = {
 
 VIDEO_RES_SIZE_INFO: dict[str, dict[str, tuple[int, int]]] = {
     # Our desired 256 resolution is the one below (commented).
-
     # Desired: "256": {"1,1": (336, 336), "4,3": (384, 288), "3,4": (288, 384), "16,9": (448, 256), "9,16": (256, 448)},
     "256": {
         "1,1": (256, 256),

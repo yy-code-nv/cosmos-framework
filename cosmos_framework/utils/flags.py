@@ -39,7 +39,8 @@ TRAINING: Final[bool] = _get_bool("COSMOS_TRAINING", True)
 This is used to make training dependencies optional.
 """
 
-INTERNAL: Final[bool] = _get_bool("COSMOS_INTERNAL", False)
+# COSMOS-RELEASE-REPLACE-NEXT: TRAINING False
+INTERNAL: Final[bool] = _get_bool("COSMOS_INTERNAL", TRAINING)
 """Whether to use internal (nvidia-only) resources (e.g. S3)."""
 
 SMOKE: Final[bool] = _get_bool("COSMOS_SMOKE", False)

@@ -1517,7 +1517,7 @@ class AutoencoderKL(ModelMixin, ConfigMixin, FromOriginalModelMixin):
             self.post_logit_scale = None
             self.post_logit_bias = None
 
-        # Text decoder (Qwen3-based causal LM for image-to-text generation)
+        # Text decoder (configured causal LM for image-to-text generation)
         if self.use_text_decoder and text_decoder_model_name is not None:
             from cosmos_framework.model.tokenizer.models.text_decoder import (
                 TextDecoderWrapper,

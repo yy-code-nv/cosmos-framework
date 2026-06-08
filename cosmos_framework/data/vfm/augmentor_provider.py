@@ -564,6 +564,9 @@ def get_video_augmentor_v3(
     conditioning_config = kwargs.get("conditioning_config", None)
     uniform_conditioning = kwargs.get("uniform_conditioning", False)
     temporal_compression_factor = kwargs.get("temporal_compression_factor", 4)
+    causal_vae = kwargs.get("causal_vae", True)
+    uniae_pad_frames = kwargs.get("uniae_pad_frames", None)
+    uniae_chunk_frames = kwargs.get("uniae_chunk_frames", None)
 
     print("Running video_basic_augmentor_v3...")
     augmentors = {
@@ -577,6 +580,9 @@ def get_video_augmentor_v3(
                 "min_stride": min_stride,
                 "seek_mode": "exact",  # Change to "approximate"?
                 "dataset_resolution_type": dataset_resolution_type,
+                "causal_vae": causal_vae,
+                "uniae_pad_frames": uniae_pad_frames,
+                "uniae_chunk_frames": uniae_chunk_frames,
             },
         ),
         "merge_datadict": L(merge_datadict.DataDictMerger)(
@@ -668,7 +674,6 @@ def get_video_augmentor_v3(
         augmentors["video_parsing"]["args"]["size"] = VIDEO_RES_SIZE_INFO[resolution]
         del augmentors["resize_largest_side_aspect_ratio_preserving"]
     return augmentors
-
 
 
 # Use video_basic_augmentor_v3_json_caption instead.
@@ -829,6 +834,7 @@ def get_video_augmentor_v3_json_caption(
     conditioning_config = kwargs.get("conditioning_config", None)
     uniform_conditioning = kwargs.get("uniform_conditioning", False)
     temporal_compression_factor = kwargs.get("temporal_compression_factor", 4)
+    causal_vae = kwargs.get("causal_vae", True)
 
     print("Running video_augmentor_v3_json_caption...")
     augmentors = {
@@ -856,6 +862,7 @@ def get_video_augmentor_v3_json_caption(
                 "extract_audio": extract_audio,
                 "audio_sample_rate": audio_sample_rate,
                 "emit_placeholder_sound": not extract_audio,
+                "causal_vae": causal_vae,
             },
         ),
         "merge_datadict": L(merge_datadict.DataDictMerger)(

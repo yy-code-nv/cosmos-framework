@@ -908,7 +908,7 @@ def is_upsampled_prompt(prompt: str) -> bool:
     the native upsampler again.
 
     Used by inference callers (e.g.
-    ``cosmos_framework.inference.OmniInference._iter_predictions``) to decide
+    ``cosmos3.inference.OmniInference._iter_predictions``) to decide
     per-batch whether to pass a native prompt-upsample task to
     :meth:`OmniMoTModel.generate_samples_from_batch`.  Two motivating
     cases produce already-upsampled prompts:

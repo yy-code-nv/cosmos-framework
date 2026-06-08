@@ -110,7 +110,7 @@ def _patch_import():
     old_import = builtins.__import__
 
     def find_relative_file(original_file, relative_import_path, level):
-
+        # NOTE: "from . import x" is not handled. Because then it's unclear
         # if such import should produce `x` as a python module or DictConfig.
         # This can be discussed further if needed.
         relative_import_err = """
@@ -321,26 +321,6 @@ class LazyConfig:
             except Exception as e:
                 return False
 
-        # For classes / functions / bound methods we want the importable dotted
-        # path, not `repr(obj)` — the latter yields strings like
-        # `<class 'cosmos.X'>` or `<function f at 0x…>` which break any
-        # downstream consumer that calls hydra.utils.instantiate on the loaded
-        # YAML (e.g. cosmos_framework.scripts.export_model).
-        from cosmos_framework.utils.lazy_config.registry import convert_target_to_string
-
-        def _to_safe_string(value):
-            # Preserve primitives — `str(True)` is the literal string `"True"`,
-            # which yaml then quotes and downstream consumers parse as a string
-            # instead of the original bool/int/float.
-            if isinstance(value, (bool, int, float, str)) or value is None:
-                return value
-            try:
-                if callable(value):
-                    return convert_target_to_string(value)
-            except Exception:
-                pass
-            return str(value)
-
         # Function to convert unserializable items to strings
         def serialize_config(config):
             if isinstance(config, DictConfig):
@@ -358,14 +338,14 @@ class LazyConfig:
                         serialize_config(value)
                     else:
                         if not is_serializable(value) and value is not None:
-                            config[key] = _to_safe_string(value)
+                            config[key] = str(value)
             elif isinstance(config, ListConfig):
                 for i, item in enumerate(config):
                     if isinstance(item, (DictConfig, ListConfig)):
                         serialize_config(item)
                     else:
                         if not is_serializable(item) and item is not None:
-                            config[i] = _to_safe_string(item)
+                            config[i] = str(item)
             else:
                 raise NotImplementedError("Input config must be a DictConfig or ListConfig.")
             return config

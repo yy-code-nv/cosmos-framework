@@ -24,6 +24,7 @@ from cosmos_framework.model.attention.utils.safe_ops.functools import lru_cache
 
 
 BACKEND_CHECK_MAP = {
+    "cudnn": cudnn_attention_check,  # COSMOS-RELEASE-IGNORELINE
     "natten": natten_attention_check,
     "flash2": flash2_attention_check,
     "flash3": flash3_attention_check,
@@ -131,6 +132,7 @@ def get_backend_list(arch_tag: int) -> list[str]:
     if arch_tag == 90:
         default_backends = [
             "flash3",
+            "cudnn",  # COSMOS-RELEASE-IGNORELINE
             "natten",
             "flash2",
         ]
@@ -142,6 +144,7 @@ def get_backend_list(arch_tag: int) -> list[str]:
     elif arch_tag >= 80:
         default_backends = [
             "flash2",
+            "cudnn",  # COSMOS-RELEASE-IGNORELINE
             "natten",
         ]
     else:

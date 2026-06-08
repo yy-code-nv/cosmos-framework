@@ -13,7 +13,7 @@ from transformers.utils.import_utils import is_torchdynamo_compiling
 
 from cosmos_framework.utils import log
 
-_EXPECTED_TRANSFORMERS_VERSION_PREFIX = "4.57."
+_EXPECTED_TRANSFORMERS_VERSION = "4.57.1"
 
 
 def patch_qwen3_vl_forward(model):
@@ -28,7 +28,7 @@ def patch_qwen3_vl_forward(model):
         model: The ``Qwen3VLModel`` instance (i.e. ``model.model.model`` when
             the outer model is ``HFModel``).
     """
-    if not transformers.__version__.startswith(_EXPECTED_TRANSFORMERS_VERSION_PREFIX):
+    if transformers.__version__ != _EXPECTED_TRANSFORMERS_VERSION:
         raise ValueError(f"monkey patching transformers version {transformers.__version__} is not supported")
 
     if not isinstance(model, Qwen3VLModel):

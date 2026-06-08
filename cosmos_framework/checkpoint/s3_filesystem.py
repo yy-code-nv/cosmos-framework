@@ -285,7 +285,7 @@ class S3StorageWriter(FileSystemWriter):
         """
         super().__init__(
             path=path,
-            sync_files=False,
+            sync_files=False,  # FIXME: setting this to True makes the run to fail (L#333: `os.fsync(stream.fileno())`)
             **kwargs,
         )
         self.fs = S3FileSystem(credential_path, enable_gcs_patch_in_boto3=enable_gcs_patch_in_boto3)  # type: ignore

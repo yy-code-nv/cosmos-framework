@@ -26,9 +26,7 @@ def create_text_guardrail_runner(offload_model_to_cpu: bool = False) -> Guardrai
 def create_video_guardrail_runner(offload_model_to_cpu: bool = False) -> GuardrailRunner:
     """Create the video guardrail runner."""
     return GuardrailRunner(
-        safety_models=[
-            # VideoContentSafetyFilter(offload_model_to_cpu=offload_model_to_cpu), # Too many false positives
-        ],
+        safety_models=[VideoContentSafetyFilter(offload_model_to_cpu=offload_model_to_cpu)],
         postprocessors=[RetinaFaceFilter(offload_model_to_cpu=offload_model_to_cpu)],
     )
 

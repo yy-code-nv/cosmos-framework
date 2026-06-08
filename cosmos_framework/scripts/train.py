@@ -1,28 +1,6 @@
 # SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 # SPDX-License-Identifier: OpenMDW-1.1
 
-"""SFT training entrypoint backed by the structured TOML dataclass.
-
-Sole input is ``--sft-toml <path>`` — no ``--config`` or interface_toml flow.
-
-Usage::
-
-    torchrun --nproc_per_node=<N> -m cosmos_framework.scripts.train \\
-        --sft-toml=examples/toml/sft_config/<experiment>.toml \\
-        -- optimizer.lr=1e-5 trainer.max_iter=200
-
-The TOML is loaded via ``SFTExperimentConfig.from_toml`` (structural validation,
-raises on unknown keys), then
-``cosmos_framework.configs.toml_config.sft_config.load_experiment_from_toml`` picks the
-base ``config.py`` from ``[job].task`` (``vfm`` → ``cosmos_framework/configs/base/config.py``,
-``vlm`` → ``cosmos_framework/configs/base/vlm/config.py``), resolves ``[job].experiment``
-against the Hydra ``ConfigStore``, and overlays every other TOML key as a Hydra
-override. Trailing ``key.path=value`` positionals are applied last (so they
-win over TOML).
-"""
-
-from __future__ import annotations
-
 import argparse
 import os
 import traceback
@@ -30,15 +8,13 @@ import traceback
 import torch
 from loguru import logger as logging
 
-from cosmos_framework.utils.config import Config
+from cosmos_framework.utils.config import Config, load_config, pretty_print_overrides
 from cosmos_framework.utils.lazy_config import LazyConfig, instantiate
 from cosmos_framework.utils.serialization import to_yaml
 from cosmos_framework.utils import distributed
 from cosmos_framework.utils.context_managers import data_loader_init, distributed_init, model_init
 from cosmos_framework.utils.launch import log_reproducible_setup
 from cosmos_framework.utils.training_telemetry import telemetry
-from cosmos_framework.configs.toml_config.sft_config import load_experiment_from_toml
-
 
 # ---------------------------------------------------------------------------
 # --deterministic: mirrors launch_vfm.sh determinism settings.
@@ -50,7 +26,7 @@ from cosmos_framework.configs.toml_config.sft_config import load_experiment_from
 #      and torch backend flags take effect.
 #   2. _apply_deterministic_config_overrides() — after load_config but before
 #      config.freeze(), so the config mutations land before trainer.__init__
-#      re-applies cudnn from config (imaginaire/trainer.py:125-126).
+#      re-applies cudnn from config (cosmos_framework/trainer.py:125-126).
 #
 # PYTHONHASHSEED must be set externally (Python locks it at interpreter startup);
 # we only warn when it's missing.
@@ -69,6 +45,9 @@ def _setup_deterministic_env_and_backends() -> None:
     # CUBLAS_WORKSPACE_CONFIG must be set before any CUBLAS init, hence script entry.
     # ":4096:8" is the value recommended by PyTorch's `torch.use_deterministic_algorithms`
     # docs for CUDA >= 10.2 — without it, deterministic cuBLAS GEMMs raise RuntimeError.
+    # Refs:
+    #   - https://pytorch.org/docs/stable/generated/torch.use_deterministic_algorithms.html
+    #   - https://docs.nvidia.com/cuda/cublas/index.html#results-reproducibility
     os.environ.setdefault("CUBLAS_WORKSPACE_CONFIG", ":4096:8")
     torch.backends.cudnn.deterministic = True
     torch.backends.cudnn.benchmark = False
@@ -122,16 +101,7 @@ def _apply_deterministic_config_overrides(config: Config) -> None:
                     n += _walk(item, mutations)
         return n
 
-    # persistent_workers=False is needed alongside num_workers=0 — PyTorch's
-    # DataLoader rejects (num_workers=0, persistent_workers=True) with
-    # ValueError. Nested dataloaders (e.g. PackingDataLoader → RankPartitionedDataLoader)
-    # pass the kwargs straight to torch.utils.data.DataLoader so they trip on this.
-    dl_overrides = {
-        "num_workers": 0,
-        "prefetch_factor": None,
-        "persistent_workers": False,
-        "detshuffle": True,
-    }
+    dl_overrides = {"num_workers": 0, "prefetch_factor": None, "detshuffle": True}
     n_dl = _walk(config.dataloader_train, dl_overrides) + _walk(config.dataloader_val, dl_overrides)
 
     def _force_compile_disabled(cfg) -> int:
@@ -188,7 +158,7 @@ def launch(config: Config, args: argparse.Namespace) -> None:
     # Apply --deterministic config-level overrides before validate/freeze/trainer-init
     # so (a) validate inspects the config the trainer will actually consume, and
     # (b) trainer.__init__ doesn't undo the script-level backends settings
-    # (imaginaire/trainer.py:125-126 re-applies cudnn from config).
+    # (cosmos_framework/trainer.py:125-126 re-applies cudnn from config).
     if args.deterministic:
         _apply_deterministic_config_overrides(config)
     # Check that the config is valid
@@ -225,28 +195,20 @@ def launch(config: Config, args: argparse.Namespace) -> None:
 
 
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser(description="SFT training (structured TOML)")
-    parser.add_argument(
-        "--sft-toml",
-        required=True,
-        help=(
-            "Path to an SFT structured-dataclass TOML — see "
-            "cosmos_framework/configs/toml_config/sft_config.py "
-            "(SFTExperimentConfig)."
-        ),
-    )
+    # Usage: torchrun --nproc_per_node=1 -m scripts.train --config=projects/<project>/configs/config.py
+
+    # Get the config file from the input arguments.
+    parser = argparse.ArgumentParser(description="Training")
+    parser.add_argument("--config", help="Path to the config file", required=False)
     parser.add_argument(
         "opts",
+        help="""
+Modify config options at the end of the command. For Yacs configs, use
+space-separated "PATH.KEY VALUE" pairs.
+For python-based LazyConfig, use "path.key=value".
+        """.strip(),
+        default=None,
         nargs=argparse.REMAINDER,
-        default=[],
-        help=(
-            "Extra Hydra-style dotted-path overrides applied AFTER the TOML "
-            "values (so they win). Use the standard Hydra syntax, e.g. "
-            "'optimizer.lr=1e-5 trainer.max_iter=200 "
-            "model.config.parallelism.data_parallel_shard_degree=4'. "
-            "Prefix with '--' to make argparse stop interpreting the rest as "
-            "flags."
-        ),
     )
     parser.add_argument(
         "--dryrun",
@@ -278,14 +240,12 @@ if __name__ == "__main__":
     if args.deterministic:
         _setup_deterministic_env_and_backends()
 
-    config = load_experiment_from_toml(args.sft_toml, extra_overrides=args.opts)
-
-    # log_reproducible_setup reads args.config for telemetry; this entrypoint
-    # only takes --sft-toml, so alias it so the launch info records the TOML.
-    args.config = args.sft_toml
+    config = load_config(args.config, args.opts, enable_one_logger=True)
 
     if args.dryrun:
-        logging.info("Config:\n" + config.pretty_print(use_color=True))
+        logging.info(
+            "Config:\n" + config.pretty_print(use_color=True) + "\n" + pretty_print_overrides(args.opts, use_color=True)
+        )
         os.makedirs(config.job.path_local, exist_ok=True)
         try:
             to_yaml(config, f"{config.job.path_local}/config.yaml")
@@ -295,4 +255,5 @@ if __name__ == "__main__":
             LazyConfig.save_yaml(config, f"{config.job.path_local}/config.yaml")
         print(f"{config.job.path_local}/config.yaml")
     else:
+        # Launch the training job.
         launch(config, args)
