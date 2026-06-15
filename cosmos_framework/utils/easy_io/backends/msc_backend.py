@@ -23,6 +23,7 @@ from cosmos_framework.utils.easy_io.backends.base_backend import BaseStorageBack
 
 # {scheme}://
 _URL_PREFIX_REGEX = r"[a-zA-Z0-9+.-]*:\/\/"
+_DEFAULT_MAX_ATTEMPTS = 50
 
 
 def _get_telemetry_config_from_msc_secret() -> Optional[dict[str, Any]]:
@@ -126,7 +127,7 @@ def _get_telemetry_config_from_msc_secret() -> Optional[dict[str, Any]]:
                     },
                     # Progressive enhancement for Slurm environments.
                     #
-                    # https://slurm.schedmd.com/prolog_epilog.html#environment_variables
+                    # https://invalid_url
                     {
                         "type": "environment_variables",
                         "options": {
@@ -267,6 +268,11 @@ class MSCBackend(BaseStorageBackend):
                             "base_path": "",
                             "endpoint_url": legacy_boto3_config["endpoint_url"],
                             "region_name": legacy_boto3_config["region_name"],
+                            "retries": {
+                                "mode": "standard",
+                                "total_max_attempts": _DEFAULT_MAX_ATTEMPTS,
+                            }
+                            | legacy_boto3_config.get("retries", {}),
                         },
                     }
 

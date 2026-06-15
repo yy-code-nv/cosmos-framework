@@ -207,8 +207,10 @@ class LocalBackend(BaseStorageBackend):
             >>> backend.join_path(filepath1, filepath2, filepath3)
             '/path/of/dir/dir2/path/of/file'
         """
-        # TODO, if filepath or filepaths are Path, should return Path
-        return osp.join(filepath, *filepaths)
+        result = osp.join(filepath, *filepaths)
+        if isinstance(filepath, Path) or any(isinstance(p, Path) for p in filepaths):
+            return Path(result)
+        return result
 
     @contextmanager
     def get_local_path(

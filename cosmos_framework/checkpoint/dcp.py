@@ -63,6 +63,7 @@ from torch.distributed.checkpoint.state_dict import (
     set_model_state_dict,
 )
 from torch.distributed.checkpoint.stateful import Stateful
+from torch.nn.modules.module import _IncompatibleKeys
 
 from cosmos_framework.checkpoint.base import AbstractCheckpointer
 from cosmos_framework.checkpoint.s3_filesystem import S3StorageReader, S3StorageWriter
@@ -85,11 +86,11 @@ class ModelWrapper(Stateful):
     def state_dict(self) -> dict[str, Any]:
         return get_model_state_dict(self.model)
 
-    def load_state_dict(self, state_dict: dict[str, Any]) -> None:
-        set_model_state_dict(
+    def load_state_dict(self, state_dict: dict[str, Any]) -> _IncompatibleKeys:
+        return set_model_state_dict(
             self.model,
             model_state_dict=state_dict,
-            options=StateDictOptions(strict=True),
+            options=StateDictOptions(strict=False),
         )
 
 
@@ -540,13 +541,12 @@ class DistributedCheckpointer(AbstractCheckpointer):
                                 )
                                 _state_dict[sd_key] = _state_dict[key_ema]
                     results = _model_wrapper.load_state_dict(_state_dict)
-                    if results is not None:
-                        if len(results.missing_keys) > 0:
-                            raise ValueError(f"Missing keys (not found in checkpoint): {results.missing_keys}")
-                        if len(results.unexpected_keys) > 0:
-                            raise ValueError(
-                                f"Unexpected keys (found in checkpoint but not in model): {results.unexpected_keys}"
-                            )
+                    if len(results.missing_keys) > 0:
+                        raise ValueError(f"Missing keys (not found in checkpoint): {results.missing_keys}")
+                    if len(results.unexpected_keys) > 0:
+                        raise ValueError(
+                            f"Unexpected keys (found in checkpoint but not in model): {results.unexpected_keys}"
+                        )
 
                 elif key == "optim":
                     log.info("- Loading the optimizer...")
